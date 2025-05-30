@@ -1,0 +1,19 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "PIXI",
+    "PixiJS",
+    "atlasLoader",
+    "Pinia",
+    "composables",
+    "textarea",
+    "vueuse",
+    "webgl",
+    "scoped",
+    "TypeScript",
+    "nullable",
+    "readonly"
+  ],
+  "ignorePaths": ["node_modules/**", "dist/**", "*.min.js"]
+}

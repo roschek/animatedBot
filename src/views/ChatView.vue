@@ -22,11 +22,13 @@
           </div>
 
           <div class="chat-page__animation">
-            <!-- Character animation will be here -->
-            <div class="character-placeholder">
-              <div class="character-placeholder__avatar">🤖</div>
-              <p class="character-placeholder__text">Character animation will be here</p>
-            </div>
+            <AnimatedCharacter
+              :current-animation="currentAnimation"
+              :is-speaking="isLoading"
+              :character-state="characterState"
+              :scale="0.5"
+              :show-debug="isDevelopment"
+            />
           </div>
         </div>
 
@@ -39,27 +41,29 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chat'
 import MessageList from '@/components/Chat/MessageList.vue'
 import MessageInput from '@/components/Chat/MessageInput.vue'
+import AnimatedCharacter from '@/components/Animation/AnimatedCharacter.vue'
+import type { AnimationName, CharacterState } from '@/types/animation'
+
+const currentAnimation = ref<AnimationName>('idle')
+const characterState = ref<CharacterState>('idle')
+const isDevelopment = computed(() => import.meta.env.DEV)
 
 const chatStore = useChatStore()
 
-// Реактивные значения через storeToRefs
 const { paginatedMessages, totalMessages, currentPage, totalPages, hasMoreMessages, isLoading } =
   storeToRefs(chatStore)
 
-// Методы из store
 const { sendMessage, clearMessages, loadNextPage, loadPreviousPage, initializeChat } = chatStore
 
-// Methods
 const handleSendMessage = (message: string): void => {
   sendMessage(message)
 }
 
-// Initialize chat on mount
 onMounted(() => {
   initializeChat()
 })

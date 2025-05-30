@@ -17,25 +17,11 @@ export interface AnimatedCharacterProps {
   showDebug?: boolean
 }
 
-export interface AtlasData {
-  frames: Record<
-    string,
-    {
-      frame: { x: number; y: number; w: number; h: number }
-      rotated: boolean
-      trimmed: boolean
-      spriteSourceSize: { x: number; y: number; w: number; h: number }
-      sourceSize: { w: number; h: number }
-    }
-  >
-  meta: {
-    app: string
-    version: string
-    image: string
-    format: string
-    size: { w: number; h: number }
-    scale: string
-  }
+export interface AtlasFrame {
+  x: number
+  y: number
+  w: number
+  h: number
 }
 
 export interface AnimationSequence {
@@ -43,8 +29,4 @@ export interface AnimationSequence {
   frames: string[]
   frameRate: number
   loop: boolean
-}
-
-export interface CharacterAnimations {
-  [key: string]: AnimationSequence
 }
