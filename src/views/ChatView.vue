@@ -33,7 +33,11 @@
         </div>
 
         <div class="chat-page__input">
-          <MessageInput :is-loading="isLoading" @send-message="handleSendMessage" />
+          <MessageInput
+            :is-loading="isLoading"
+            :max-length="256"
+            @send-message="handleSendMessage"
+          />
         </div>
       </main>
     </div>

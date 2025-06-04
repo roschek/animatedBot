@@ -1,3 +1,4 @@
+// src/types/animation.ts
 export type AnimationName =
   | 'idle'
   | 'talking'
@@ -15,18 +16,4 @@ export interface AnimatedCharacterProps {
   characterState?: CharacterState
   scale?: number
   showDebug?: boolean
-}
-
-export interface AtlasFrame {
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
-export interface AnimationSequence {
-  name: string
-  frames: string[]
-  frameRate: number
-  loop: boolean
 }
