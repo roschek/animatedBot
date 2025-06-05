@@ -15,6 +15,8 @@ export interface ChatState {
   isLoading: Ref<boolean>
   currentPage: Ref<number>
   messagesPerPage: Ref<number>
+  isResponding: Ref<boolean>
+  currentResponseText: Ref<string>
 }
 
 export interface ChatActions {
@@ -55,8 +57,7 @@ export interface MessageListProps {
   hasMoreMessages: boolean
 }
 
-export interface MessageInputProps {
-  isLoading: boolean
+export interface MessageInputProps {  
   maxLength: number
 }
 

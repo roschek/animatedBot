@@ -24,20 +24,15 @@
           <div class="chat-page__animation">
             <AnimatedCharacter
               :current-animation="currentAnimation"
-              :is-speaking="isLoading"
+              :is-speaking="characterState === 'speaking'"
               :character-state="characterState"
-              :scale="0.5"
-              :show-debug="isDevelopment"
+              :scale="1"
             />
           </div>
         </div>
 
         <div class="chat-page__input">
-          <MessageInput
-            :is-loading="isLoading"
-            :max-length="256"
-            @send-message="handleSendMessage"
-          />
+          <MessageInput :max-length="100" @send-message="handleSendMessage" />
         </div>
       </main>
     </div>
@@ -45,28 +40,65 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chat'
+import { useAnimation } from '@/composables/useAnimation'
 import MessageList from '@/components/Chat/MessageList.vue'
 import MessageInput from '@/components/Chat/MessageInput.vue'
 import AnimatedCharacter from '@/components/Animation/AnimatedCharacter.vue'
-import type { AnimationName, CharacterState } from '@/types/animation'
 
-const currentAnimation = ref<AnimationName>('idle')
-const characterState = ref<CharacterState>('idle')
-const isDevelopment = computed(() => import.meta.env.DEV)
+//const isDevelopment = computed(() => import.meta.env.DEV)
 
 const chatStore = useChatStore()
-
-const { paginatedMessages, totalMessages, currentPage, totalPages, hasMoreMessages, isLoading } =
-  storeToRefs(chatStore)
-
+const {
+  paginatedMessages,
+  totalMessages,
+  currentPage,
+  totalPages,
+  hasMoreMessages,
+  isLoading,
+  messages,
+} = storeToRefs(chatStore)
 const { sendMessage, clearMessages, loadNextPage, loadPreviousPage, initializeChat } = chatStore
 
-const handleSendMessage = (message: string): void => {
-  sendMessage(message)
+// Используем композабл анимаций
+const {
+  currentAnimation,
+  characterState,
+  handleMessageSent,
+  handleResponseStart,
+  handleResponseReceived,
+} = useAnimation()
+
+const handleSendMessage = async (message: string): Promise<void> => {
+  // Запускаем анимацию отправки сообщения
+  handleMessageSent(message)
+
+  // Отправляем сообщение в store
+  await sendMessage(message)
 }
+
+// Отслеживаем изменения количества сообщений (более эффективно)
+watch(
+  () => messages.value.length,
+  (newLength, oldLength) => {
+    if (newLength > oldLength) {
+      const lastMessage = messages.value[newLength - 1]
+
+      if (lastMessage.sender === 'assistant' && !lastMessage.isTyping) {
+        handleResponseReceived(lastMessage.content)
+      }
+    }
+  },
+)
+
+// Отслеживаем состояние загрузки
+watch(isLoading, (loading) => {
+  if (loading) {
+    handleResponseStart()
+  }
+})
 
 onMounted(() => {
   initializeChat()

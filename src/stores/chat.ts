@@ -3,13 +3,13 @@ import { ref, computed } from 'vue'
 import type { ChatMessage, MessageSender, ChatStore } from '@/types/chat'
 
 export const useChatStore = defineStore('chat', (): ChatStore => {
-  // State
   const messages = ref<ChatMessage[]>([])
   const isLoading = ref<boolean>(false)
   const currentPage = ref<number>(1)
   const messagesPerPage = ref<number>(50)
+  const isResponding = ref<boolean>(false)
+  const currentResponseText = ref<string>('')
 
-  // Getters
   const totalMessages = computed((): number => messages.value.length)
   const totalPages = computed((): number => Math.ceil(totalMessages.value / messagesPerPage.value))
 
@@ -21,7 +21,6 @@ export const useChatStore = defineStore('chat', (): ChatStore => {
 
   const hasMoreMessages = computed((): boolean => currentPage.value < totalPages.value)
 
-  // Actions
   const addMessage = (content: string, sender: MessageSender = 'user'): ChatMessage => {
     const message: ChatMessage = {
       id: Date.now() + Math.random(),
@@ -32,7 +31,6 @@ export const useChatStore = defineStore('chat', (): ChatStore => {
     }
     messages.value.push(message)
 
-    // Auto scroll to latest page
     if (messages.value.length > messagesPerPage.value) {
       currentPage.value = totalPages.value
     }
@@ -64,33 +62,27 @@ export const useChatStore = defineStore('chat', (): ChatStore => {
 
     isLoading.value = true
 
-    // Add user message
     addMessage(content, 'user')
-
-    // Add typing indicator
     addTypingMessage()
 
     try {
-      // Simulate AI response delay
-      await new Promise<void>((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000))
+      await new Promise<void>((resolve) => setTimeout(resolve, 800 + Math.random() * 1200))
 
-      // Remove typing indicator
       removeTypingMessage()
 
-      // Add AI response (mock for now)
-      const responses: string[] = [
-        "That's an interesting question! Let me think about it.",
-        "I understand what you're asking. Here's my perspective...",
-        "Great point! I'd like to add that...",
-        'Thanks for sharing that with me!',
-        'That makes sense. Would you like me to elaborate?',
-        'I appreciate you bringing this up!',
-        "That's a fascinating topic to discuss.",
-        'I see what you mean. Let me explain further...',
-      ]
+      const echoResponse = content
+      currentResponseText.value = echoResponse
+      isResponding.value = true
 
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)]
-      addMessage(randomResponse, 'assistant')
+      addMessage(echoResponse, 'assistant')
+
+      setTimeout(
+        () => {
+          isResponding.value = false
+          currentResponseText.value = ''
+        },
+        echoResponse.length * 200 + 1000,
+      )
     } catch (error) {
       removeTypingMessage()
       addMessage("Sorry, I'm having trouble responding right now. Please try again.", 'assistant')
@@ -103,6 +95,10 @@ export const useChatStore = defineStore('chat', (): ChatStore => {
   const clearMessages = (): void => {
     messages.value = []
     currentPage.value = 1
+    isLoading.value = false
+    isResponding.value = false
+    currentResponseText.value = ''
+    initializeChat()
   }
 
   const loadNextPage = (): void => {
@@ -117,24 +113,25 @@ export const useChatStore = defineStore('chat', (): ChatStore => {
     }
   }
 
-  // Initialize with welcome message
   const initializeChat = (): void => {
     if (messages.value.length === 0) {
-      addMessage("Hello! I'm your AI companion. How can I help you today?", 'assistant')
+      addMessage("Hello! I'm your AI companion. I'll repeat whatever you say!", 'assistant')
     }
   }
 
-  return {    
+  return {
     messages,
     isLoading,
     currentPage,
     messagesPerPage,
+    isResponding,
+    currentResponseText,
 
     totalMessages,
     totalPages,
     paginatedMessages,
     hasMoreMessages,
-    
+
     addMessage,
     addTypingMessage,
     removeTypingMessage,

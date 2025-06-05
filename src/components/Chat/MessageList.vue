@@ -88,10 +88,9 @@ const scrollToBottom = (): void => {
   })
 }
 
-// Auto scroll to bottom when new messages arrive
 watch(
   () => props.messages.length,
-  (newLength: number, oldLength: number) => {
+  (newLength, oldLength = 0) => {
     if (newLength > oldLength) {
       scrollToBottom()
     }

@@ -2,16 +2,13 @@
   <div class="message-input">
     <form class="message-input__form" @submit.prevent="handleSubmit">
       <div class="message-input__group">
-        <textarea
-          ref="textareaRef"
+        <input
+          ref="inputRef"
           v-model="message"
-          class="message-input__textarea"
-          placeholder="Type your message..."
-          :disabled="isLoading"
+          class="message-input__input"
+          placeholder="Type your message..."          
           @keydown="handleKeydown"
-          @input="adjustTextareaHeight"
-          rows="1"
-        ></textarea>
+        />
 
         <button type="submit" class="message-input__send-btn" :disabled="!canSend">
           <span v-if="isLoading" class="message-input__loading">⏳</span>
@@ -42,22 +39,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed } from 'vue'
+import { useChatStore } from '@/stores/chat'
 import type { MessageInputProps, MessageInputEmits } from '@/types/chat'
 
-const props = withDefaults(defineProps<MessageInputProps>(), {
-  isLoading: false,
+const props = withDefaults(defineProps<MessageInputProps>(), {  
   maxLength: 1000,
 })
-
+const chatStore = useChatStore()
+const { isLoading } = chatStore
 const emit = defineEmits<MessageInputEmits>()
 
 const message = ref<string>('')
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const inputRef = ref<HTMLInputElement | null>(null)
 
 const canSend = computed((): boolean => {
   return (
-    message.value.trim().length > 0 && message.value.length <= props.maxLength && !props.isLoading
+    message.value.trim().length > 0 && 
+    message.value.length <= props.maxLength
   )
 })
 
@@ -70,58 +69,27 @@ const handleSubmit = (): void => {
   if (!canSend.value) return
 
   const messageText = message.value.trim()
-  if (messageText) {
+  if (messageText) {    
     emit('send-message', messageText)
     clearMessage()
   }
 }
 
-const clearMessage = (): void => {
-  message.value = ''
-  adjustTextareaHeight()
-  focusTextarea()
+const clearMessage = (): void => {   
+   message.value = ''  
 }
 
-const focusTextarea = (): void => {
-  nextTick(() => {
-    if (textareaRef.value) {
-      textareaRef.value.focus()
-    }
-  })
-}
 
-const adjustTextareaHeight = (): void => {
-  nextTick(() => {
-    if (textareaRef.value) {
-      textareaRef.value.style.height = 'auto'
-      const scrollHeight = textareaRef.value.scrollHeight
-      const maxHeight = 120 // max height in pixels (about 6 lines)
-      textareaRef.value.style.height = Math.min(scrollHeight, maxHeight) + 'px'
-    }
-  })
-}
 
 const handleKeydown = (event: KeyboardEvent): void => {
-  // Send on Enter (but not Shift+Enter)
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
     handleSubmit()
   }
 }
 
-// Auto-focus on mount
-watch(
-  () => props.isLoading,
-  (isLoading: boolean) => {
-    if (!isLoading) {
-      focusTextarea()
-    }
-  },
-  { immediate: true },
-)
-
 defineExpose({
-  focusTextarea,
+  
   clearMessage,
 })
 </script>
@@ -143,11 +111,11 @@ defineExpose({
 
   &__group {
     @include flex-between;
-    align-items: flex-end;
+    align-items: center;
     gap: 16px;
   }
 
-  &__textarea {
+  &__input {
     flex: 1;
     padding: 16px 20px;
     border: 2px solid $border-light;
@@ -155,12 +123,9 @@ defineExpose({
     font-size: 1rem;
     font-family: inherit;
     line-height: 1.5;
-    resize: none;
     transition: border-color $transition-base;
     background: white;
-    min-height: 52px;
-    max-height: 120px;
-    overflow-y: auto;
+    height: 52px;
 
     &:focus {
       outline: none;
@@ -183,13 +148,14 @@ defineExpose({
     padding: 16px 20px;
     font-size: 1.2rem;
     min-width: 56px;
-    min-height: 52px;
+    height: 52px;
     flex-shrink: 0;
 
     &:disabled {
       background-color: $border-medium;
       transform: none;
       box-shadow: none;
+      cursor: not-allowed;
     }
   }
 
@@ -253,16 +219,17 @@ defineExpose({
       gap: 12px;
     }
 
-    &__textarea {
+    &__input {
       padding: 12px 16px;
       font-size: 0.9rem;
+      height: 44px;
     }
 
     &__send-btn {
       padding: 12px 16px;
       font-size: 1.1rem;
       min-width: 48px;
-      min-height: 44px;
+      height: 44px;
     }
   }
 }
