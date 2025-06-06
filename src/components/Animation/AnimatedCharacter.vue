@@ -3,16 +3,19 @@
     <div ref="playerContainer" class="spine-character__player" :style="containerStyles"></div>
 
     <div v-if="showDebug" class="spine-character__debug">
-      <p>Current: {{ currentAnimation }}</p>
-      <p>Store Loading: {{ isLoading }}</p>
-      <p>Store Responding: {{ isResponding }}</p>
-      <p>Response Text: "{{ currentResponseText.slice(0, 20) }}..."</p>
-      <p>Internal State: {{ internalState }}</p>
-      <p>Speed: {{ speechSpeed }}ms</p>
-      <button @click="testSpeech" class="debug-btn">Test Speech</button>
-      <button @click="playRandomAnimation" class="debug-btn">Random Anim</button>
-      <button @click="toggleSpeed" class="debug-btn">Speed: {{ speechSpeed }}ms</button>
-      <button @click="forceIdle" class="debug-btn">Force Idle</button>
+      <p><strong>Animation:</strong> {{ currentAnimation }}</p>
+      <p><strong>State:</strong> {{ internalState }} | <strong>Animating:</strong> {{ isAnimating ? '🎬' : '⏸️' }}</p>
+      <p><strong>Store:</strong> Loading: {{ isLoading ? '🔄' : '❌' }} | Responding: {{ isResponding ? '💬' : '❌' }}</p>
+      <p><strong>Text:</strong> "{{ currentResponseText.slice(0, 25) }}{{ currentResponseText.length > 25 ? '...' : '' }}"</p>
+      <p><strong>Speed:</strong> {{ speechSpeed }}ms</p>
+      <p><strong>Timeouts:</strong> Loading: {{ loadingTimeout ? '⏱️' : '❌' }} | Responding: {{ respondingTimeout ? '⏱️' : '❌' }}</p>
+      <div style="margin-top: 8px;">
+        <button @click="testSpeech" class="debug-btn">Test Speech</button>
+        <button @click="playRandomAnimation" class="debug-btn">Random Lip</button>
+        <button @click="toggleSpeed" class="debug-btn">Speed: {{ speechSpeed }}</button>
+        <button @click="forceIdle" class="debug-btn">Force Idle</button>
+        <button @click="forceWalking" class="debug-btn">Force Walk</button>
+      </div>
     </div>
   </div>
 </template>
@@ -44,8 +47,12 @@ const playerContainer = ref<HTMLElement | null>(null)
 const spinePlayer = ref<spine.SpinePlayer | null>(null)
 const currentAnimation = ref('loop_idle')
 const isAnimating = ref(false)
-const speechSpeed = ref(50)
+const speechSpeed = ref(120) // Увеличиваем базовую скорость для плавности
 const internalState = ref<'idle' | 'thinking' | 'speaking'>('idle')
+
+// Debounce переменные для watchers
+let loadingTimeout: number | null = null
+let respondingTimeout: number | null = null
 
 const animationList = [
   'brows_angry', 'brows_default', 'brows_happy', 'brows_sad',
@@ -129,10 +136,33 @@ const playAnimation = (animationName: string) => {
   }
 }
 
+// Плавный переход между основными состояниями
+const smoothTransitionTo = async (targetAnimation: string, transitionDelay: number = 300) => {
+  // Для основных состояний (idle/walking) - прямой переход без промежуточных анимаций
+  if (targetAnimation === 'loop_idle' || targetAnimation === 'loop_walking') {
+    playAnimation(targetAnimation)
+    return
+  }
+  
+  // Для речевых анимаций - используем промежуточную анимацию
+  if (currentAnimation.value !== 'lips_default_smile' && targetAnimation !== currentAnimation.value) {
+    playAnimation('lips_default_smile')
+    await new Promise(resolve => setTimeout(resolve, transitionDelay))
+  }
+  
+  playAnimation(targetAnimation)
+}
+
 const speak = async (text: string) => {
-  if (!text.trim() || isAnimating.value) return
+  if (!text.trim()) return
 
   console.log('🗣️ Starting speech:', text)
+  
+  // Прерываем thinking если нужно
+  if (internalState.value === 'thinking') {
+    console.log('🤔→💬 Transitioning from thinking to speaking')
+  }
+  
   isAnimating.value = true
   internalState.value = 'speaking'
   
@@ -145,42 +175,61 @@ const speak = async (text: string) => {
     const animation = speechPattern[i]
     playAnimation(animation)
 
-    // Add some randomness to timing
-    const variance = speechSpeed.value * 0.3
-    const delay = speechSpeed.value + (Math.random() - 0.5) * variance
+    // Более длинные паузы для плавности
+    let delay = speechSpeed.value
+    
+    // Увеличиваем паузы для определенных анимаций
+    if (animation === 'lips_default_smile') {
+      delay = speechSpeed.value * 1.5 // Длинные паузы между словами
+    } else if (animation.includes('brows_')) {
+      delay = speechSpeed.value * 2 // Эмоциональные выражения держим дольше
+    }
+    
+    // Добавляем небольшую случайность
+    const variance = delay * 0.2
+    delay = delay + (Math.random() - 0.5) * variance
 
     await new Promise(resolve => setTimeout(resolve, delay))
   }
 
-  // Return to idle after speech
+  // Плавное завершение речи
   if (isAnimating.value) {
     isAnimating.value = false
     internalState.value = 'idle'
-    playAnimation('loop_idle')
-    console.log('✅ Speech finished, back to idle')
+    
+    // Промежуточная пауза перед возвратом к idle
+    playAnimation('lips_default_smile')
+    await new Promise(resolve => setTimeout(resolve, 400))
+    
+    await smoothTransitionTo('loop_idle', 300)
+    console.log('✅ Speech finished, smoothly back to idle')
   }
 }
 
-const stopSpeaking = () => {
+const stopSpeaking = async () => {
   console.log('🛑 Stopping speech')
   isAnimating.value = false
   internalState.value = 'idle'
-  playAnimation('loop_idle')
+  await smoothTransitionTo('loop_idle', 200)
 }
 
 const startThinking = () => {
-  if (!isAnimating.value) {
-    console.log('🤔 Started thinking - walking animation')
-    internalState.value = 'thinking'
-    playAnimation('loop_walking')
-  }
+  // Убираем проверку isAnimating - thinking имеет приоритет над речью
+  console.log('🤔 Started thinking - walking animation')
+  internalState.value = 'thinking'
+  playAnimation('loop_walking')
 }
 
-const stopThinking = () => {
-  if (internalState.value === 'thinking') {
+const stopThinking = async () => {
+  // Останавливаем думание только если мы действительно думаем
+  if (internalState.value === 'thinking' && !isAnimating.value) {
     console.log('😴 Stopped thinking - back to idle')
     internalState.value = 'idle'
-    playAnimation('loop_idle')
+    await smoothTransitionTo('loop_idle', 200)
+  } else if (internalState.value === 'thinking' && isAnimating.value) {
+    console.log('🗣️ Stopped thinking but speech is active - will go to idle after speech')
+    // Просто меняем internal state, анимация изменится после завершения речи
+    internalState.value = 'speaking'
   }
 }
 
@@ -195,35 +244,71 @@ const playRandomAnimation = () => {
 }
 
 const toggleSpeed = () => {
-  speechSpeed.value = speechSpeed.value === 50 ? 80 : speechSpeed.value === 80 ? 120 : 50
+  speechSpeed.value = speechSpeed.value === 120 ? 80 : speechSpeed.value === 80 ? 160 : 120
 }
 
-const forceIdle = () => {
-  stopSpeaking()
-  stopThinking()
+const forceIdle = async () => {
+  await stopSpeaking()
+  await stopThinking()
 }
 
-// 🎯 АВТОНОМНЫЕ WATCHERS - следят за store
+const forceWalking = () => {
+  console.log('🚶‍♂️ Debug: Force walking animation')
+  internalState.value = 'thinking'
+  playAnimation('loop_walking')
+}
+
+// 🎯 АВТОНОМНЫЕ WATCHERS - следят за store с плавными переходами
 watch(isLoading, (loading) => {
   console.log('📊 Store isLoading changed:', loading)
+  
+  // Очищаем предыдущий timeout
+  if (loadingTimeout) {
+    clearTimeout(loadingTimeout)
+    loadingTimeout = null
+  }
+  
   if (loading) {
-    startThinking()
+    startThinking() // Сразу запускаем думание
   } else {
-    stopThinking()
+    // Небольшая задержка перед остановкой, чтобы избежать "мигания"
+    loadingTimeout = setTimeout(() => {
+      if (!isLoading.value) { // Проверяем что состояние не изменилось
+        stopThinking()
+      }
+      loadingTimeout = null
+    }, 100)
   }
 })
 
 watch(isResponding, (responding) => {
   console.log('📊 Store isResponding changed:', responding)
+  
+  // Очищаем предыдущий timeout
+  if (respondingTimeout) {
+    clearTimeout(respondingTimeout)
+    respondingTimeout = null
+  }
+  
   if (!responding) {
-    stopSpeaking()
+    // Задержка перед остановкой речи для естественности
+    respondingTimeout = setTimeout(() => {
+      if (!isResponding.value) { // Проверяем что состояние не изменилось
+        stopSpeaking()
+      }
+      respondingTimeout = null
+    }, 300)
   }
 })
 
-watch(currentResponseText, (text) => {
+watch(currentResponseText, async (text) => {
   console.log('📊 Store currentResponseText changed:', text)
   if (text && isResponding.value) {
-    speak(text)
+    // Небольшая пауза перед началом речи
+    await new Promise(resolve => setTimeout(resolve, 150))
+    if (text && isResponding.value) { // Проверяем что состояние не изменилось
+      speak(text)
+    }
   }
 })
 
@@ -251,6 +336,17 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopSpeaking()
+  
+  // Очищаем все timeouts
+  if (loadingTimeout) {
+    clearTimeout(loadingTimeout)
+    loadingTimeout = null
+  }
+  if (respondingTimeout) {
+    clearTimeout(respondingTimeout)
+    respondingTimeout = null
+  }
+  
   if (spinePlayer.value) {
     spinePlayer.value.dispose()
   }
@@ -262,6 +358,7 @@ defineExpose({
   stopSpeaking,
   playAnimation,
   forceIdle,
+  forceWalking,
 })
 </script>
 
