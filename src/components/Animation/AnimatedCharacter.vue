@@ -4,64 +4,56 @@
 
     <div v-if="showDebug" class="spine-character__debug">
       <p>Current: {{ currentAnimation }}</p>
-      <p>Speaking: {{ isSpeaking }}</p>
+      <p>Store Loading: {{ isLoading }}</p>
+      <p>Store Responding: {{ isResponding }}</p>
+      <p>Response Text: "{{ currentResponseText.slice(0, 20) }}..."</p>
+      <p>Internal State: {{ internalState }}</p>
       <p>Speed: {{ speechSpeed }}ms</p>
-      <p>Text: "{{ currentText.slice(0, 20) }}..."</p>
       <button @click="testSpeech" class="debug-btn">Test Speech</button>
       <button @click="playRandomAnimation" class="debug-btn">Random Anim</button>
       <button @click="toggleSpeed" class="debug-btn">Speed: {{ speechSpeed }}ms</button>
+      <button @click="forceIdle" class="debug-btn">Force Idle</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref, watch, computed, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useChatStore } from '@/stores/chat'
 import '@esotericsoftware/spine-player/dist/spine-player.css'
 import * as spine from '@esotericsoftware/spine-player'
 
+// Минимальный API - только конфигурация отображения
 interface Props {
-  isSpeaking?: boolean
-  currentText?: string
   scale?: number
   showDebug?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  isSpeaking: false,
-  currentText: '',
   scale: 1,
   showDebug: false,
 })
 
+// Подключаемся к store автономно
+const chatStore = useChatStore()
+const { isLoading, isResponding, currentResponseText } = storeToRefs(chatStore)
+
+// Внутреннее состояние компонента
 const playerContainer = ref<HTMLElement | null>(null)
 const spinePlayer = ref<spine.SpinePlayer | null>(null)
-const currentAnimation = ref('loop_walking')
+const currentAnimation = ref('loop_idle')
 const isAnimating = ref(false)
 const speechSpeed = ref(50)
+const internalState = ref<'idle' | 'thinking' | 'speaking'>('idle')
 
 const animationList = [
-  'brows_angry',
-  'brows_default',
-  'brows_happy',
-  'brows_sad',
-  'eyelids_bottop_closed',
-  'eyelids_closed',
-  'eyelids_upper_lowered',
-  'head_no',
-  'head_yes',
-  'lips_a_big',
-  'lips_a_small',
-  'lips_default_smile',
-  'lips_e',
-  'lips_er',
-  'lips_i',
-  'lips_m_p_b',
-  'lips_o',
-  'lips_u',
-  'lips_t_s_d_c',
-  'lips_v_f',
-  'loop_idle',
-  'loop_walking',
+  'brows_angry', 'brows_default', 'brows_happy', 'brows_sad',
+  'eyelids_bottop_closed', 'eyelids_closed', 'eyelids_upper_lowered',
+  'head_no', 'head_yes',
+  'lips_a_big', 'lips_a_small', 'lips_default_smile', 'lips_e', 'lips_er',
+  'lips_i', 'lips_m_p_b', 'lips_o', 'lips_u', 'lips_t_s_d_c', 'lips_v_f',
+  'loop_idle', 'loop_walking',
 ]
 
 const lipGroups = {
@@ -82,9 +74,9 @@ const getRandomFromGroup = (group: string[]): string => {
 }
 
 const textToSpeechPattern = (text: string): string[] => {
-  const words = text.toLowerCase().trim().split(/\s+/)
   const pattern: string[] = []
-
+  
+  // Emotional setup based on text
   if (text.includes('!')) {
     pattern.push('brows_happy')
   } else if (text.includes('?')) {
@@ -93,25 +85,37 @@ const textToSpeechPattern = (text: string): string[] => {
     pattern.push('brows_sad')
   }
 
-  // Generate speech pattern - grouped by words, not letters
-  words.forEach((word, wordIndex) => {
-    if (wordIndex > 0) {
-      // Brief pause between words
+  // Split by sentences first, then by words
+  const sentences = text.split(/([.!?;:])/g).filter(sentence => sentence.trim())
+  
+  sentences.forEach((sentence, sentenceIndex) => {
+    // Skip standalone punctuation
+    if (/^[.!?;:]+$/.test(sentence.trim())) {
+      // Pause after punctuation
       pattern.push('lips_default_smile')
+      pattern.push('lips_default_smile') // Double pause for punctuation
+      return
     }
 
-     for (let i = 0; i < Math.max(2, Math.ceil(word.length / 2)); i++) {
-      if (Math.random() > 0.6) {
-        // Vowel sound
-        pattern.push(getRandomFromGroup(lipGroups.vowels))
-      } else if (Math.random() > 0.3) {
-        // Consonant sound
-        pattern.push(getRandomFromGroup(lipGroups.consonants))
-      } else {
-        // Neutral position
-        pattern.push(getRandomFromGroup(lipGroups.neutral))
+    const words = sentence.trim().split(/\s+/).filter(word => word.length > 0)
+    
+    words.forEach((word, wordIndex) => {
+      if (wordIndex > 0) {
+        // Pause between words
+        pattern.push('lips_default_smile')
       }
-    }
+
+      // Generate realistic lip movements for the word
+      for (let i = 0; i < Math.max(2, Math.ceil(word.length / 2)); i++) {
+        if (Math.random() > 0.6) {
+          pattern.push(getRandomFromGroup(lipGroups.vowels))
+        } else if (Math.random() > 0.3) {
+          pattern.push(getRandomFromGroup(lipGroups.consonants))
+        } else {
+          pattern.push(getRandomFromGroup(lipGroups.neutral))
+        }
+      }
+    })
   })
 
   return pattern
@@ -121,19 +125,19 @@ const playAnimation = (animationName: string) => {
   if (spinePlayer.value && animationList.includes(animationName)) {
     currentAnimation.value = animationName
     spinePlayer.value.setAnimation(animationName)
+    console.log('🎬 Playing animation:', animationName)
   }
 }
-
-let speechTimeout: number | null = null
 
 const speak = async (text: string) => {
   if (!text.trim() || isAnimating.value) return
 
   console.log('🗣️ Starting speech:', text)
   isAnimating.value = true
-  const speechPattern = textToSpeechPattern(text)
+  internalState.value = 'speaking'
   
- 
+  const speechPattern = textToSpeechPattern(text)
+
   // Play speech pattern
   for (let i = 0; i < speechPattern.length; i++) {
     if (!isAnimating.value) break
@@ -145,26 +149,42 @@ const speak = async (text: string) => {
     const variance = speechSpeed.value * 0.3
     const delay = speechSpeed.value + (Math.random() - 0.5) * variance
 
-    await new Promise((resolve) => setTimeout(resolve, delay))
+    await new Promise(resolve => setTimeout(resolve, delay))
   }
 
   // Return to idle after speech
   if (isAnimating.value) {
-    playAnimation('loop_idle')
     isAnimating.value = false
+    internalState.value = 'idle'
+    playAnimation('loop_idle')
+    console.log('✅ Speech finished, back to idle')
   }
 }
 
 const stopSpeaking = () => {
   console.log('🛑 Stopping speech')
   isAnimating.value = false
-  if (speechTimeout) {
-    clearTimeout(speechTimeout)
-    speechTimeout = null
-  }
+  internalState.value = 'idle'
   playAnimation('loop_idle')
 }
 
+const startThinking = () => {
+  if (!isAnimating.value) {
+    console.log('🤔 Started thinking - walking animation')
+    internalState.value = 'thinking'
+    playAnimation('loop_walking')
+  }
+}
+
+const stopThinking = () => {
+  if (internalState.value === 'thinking') {
+    console.log('😴 Stopped thinking - back to idle')
+    internalState.value = 'idle'
+    playAnimation('loop_idle')
+  }
+}
+
+// Debug functions
 const testSpeech = () => {
   speak('Hello! How are you doing today? This is a test of the speech animation system!')
 }
@@ -175,40 +195,52 @@ const playRandomAnimation = () => {
 }
 
 const toggleSpeed = () => {
-  speechSpeed.value = speechSpeed.value === 80 ? 50 : speechSpeed.value === 50 ? 120 : 80
+  speechSpeed.value = speechSpeed.value === 50 ? 80 : speechSpeed.value === 80 ? 120 : 50
 }
 
-// Watchers
-watch(
-  () => props.currentText,
-  (newText) => {
-    if (newText && props.isSpeaking) {
-      speak(newText)
-    }
-  },
-)
+const forceIdle = () => {
+  stopSpeaking()
+  stopThinking()
+}
 
-watch(
-  () => props.isSpeaking,
-  (speaking) => {
-    if (!speaking) {
-      stopSpeaking()
-    }
-  },
-)
+// 🎯 АВТОНОМНЫЕ WATCHERS - следят за store
+watch(isLoading, (loading) => {
+  console.log('📊 Store isLoading changed:', loading)
+  if (loading) {
+    startThinking()
+  } else {
+    stopThinking()
+  }
+})
 
+watch(isResponding, (responding) => {
+  console.log('📊 Store isResponding changed:', responding)
+  if (!responding) {
+    stopSpeaking()
+  }
+})
+
+watch(currentResponseText, (text) => {
+  console.log('📊 Store currentResponseText changed:', text)
+  if (text && isResponding.value) {
+    speak(text)
+  }
+})
+
+// Инициализация Spine Player
 onMounted(() => {
+  console.log('🎮 Mounting Smart Animated Character...')
   if (playerContainer.value) {
     spinePlayer.value = new spine.SpinePlayer(playerContainer.value, {
       skeleton: '/assets/Baby_Friend42.json',
       atlas: '/assets/Baby_Friend42.atlas',
-      animation: 'loop_walking',
+      animation: 'loop_idle',
       backgroundColor: '#00000000',
       alpha: true,
       showControls: false,
       preserveDrawingBuffer: false,
       success: () => {
-        console.log('✅ Spine animation loaded successfully')
+        console.log('✅ Smart Spine animation loaded successfully')
       },
       error: (err) => {
         console.error('❌ Failed to load Spine animation:', err)
@@ -224,10 +256,12 @@ onUnmounted(() => {
   }
 })
 
+// Expose для внешнего управления (если нужно)
 defineExpose({
   speak,
   stopSpeaking,
   playAnimation,
+  forceIdle,
 })
 </script>
 
@@ -238,21 +272,43 @@ defineExpose({
   flex-direction: column;
   align-items: center;
 
+  &__player {
+    // Жёсткая фиксация размера
+    overflow: hidden;
+    
+    :deep(canvas) {
+      width: 600px !important;
+      height: 800px !important;
+      max-width: 600px !important;
+      max-height: 800px !important;
+      min-width: 600px !important;
+      min-height: 800px !important;
+      object-fit: contain;
+    }
+    
+    :deep(.spine-player-container) {
+      width: 600px !important;
+      height: 800px !important;
+    }
+  }
+
   &__debug {
     position: absolute;
     top: 10px;
     left: 10px;
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(0, 0, 0, 0.95);
     color: white;
-    padding: 12px;
+    padding: 14px;
     border-radius: 8px;
     font-family: monospace;
     font-size: 11px;
     z-index: 10;
-    min-width: 200px;
+    min-width: 250px;
+    max-width: 350px;
 
     p {
       margin: 0 0 4px 0;
+      word-break: break-word;
     }
 
     .debug-btn {

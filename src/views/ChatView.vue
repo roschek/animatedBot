@@ -22,11 +22,7 @@
           </div>
 
           <div class="chat-page__animation">
-            <AnimatedCharacter
-              :is-speaking="isResponding"
-              :current-text="currentResponseText"
-              :scale="0.6"
-            />
+            <AnimatedCharacter :scale="0.5" />
           </div>
         </div>
 
@@ -47,23 +43,18 @@ import MessageInput from '@/components/Chat/MessageInput.vue'
 import AnimatedCharacter from '@/components/Animation/AnimatedCharacter.vue'
 
 const chatStore = useChatStore()
-const {
-  paginatedMessages,
-  totalMessages,
-  currentPage,
-  totalPages,
-  hasMoreMessages,
-  isResponding,
-  currentResponseText,
-} = storeToRefs(chatStore)
+const { paginatedMessages, totalMessages, currentPage, totalPages, hasMoreMessages } =
+  storeToRefs(chatStore)
 
 const { sendMessage, clearMessages, loadNextPage, loadPreviousPage, initializeChat } = chatStore
 
 const handleSendMessage = async (message: string): Promise<void> => {
+  console.log('💬 ChatView: Sending message:', message)
   await sendMessage(message)
 }
 
 onMounted(() => {
+  console.log('🚀 ChatView: Initializing chat...')
   initializeChat()
 })
 </script>
@@ -139,10 +130,6 @@ onMounted(() => {
     @include mobile {
       min-height: 250px;
     }
-  }
-
-  &__input {
-    // MessageInput компонент имеет свои стили
   }
 }
 </style>
