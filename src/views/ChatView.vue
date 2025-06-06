@@ -23,10 +23,9 @@
 
           <div class="chat-page__animation">
             <AnimatedCharacter
-              :current-animation="currentAnimation"
-              :is-speaking="characterState === 'speaking'"
-              :character-state="characterState"
-              :scale="1"
+              :is-speaking="isResponding"
+              :current-text="currentResponseText"
+              :scale="0.6"
             />
           </div>
         </div>
@@ -40,15 +39,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chat'
-import { useAnimation } from '@/composables/useAnimation'
 import MessageList from '@/components/Chat/MessageList.vue'
 import MessageInput from '@/components/Chat/MessageInput.vue'
 import AnimatedCharacter from '@/components/Animation/AnimatedCharacter.vue'
-
-//const isDevelopment = computed(() => import.meta.env.DEV)
 
 const chatStore = useChatStore()
 const {
@@ -57,48 +53,15 @@ const {
   currentPage,
   totalPages,
   hasMoreMessages,
-  isLoading,
-  messages,
+  isResponding,
+  currentResponseText,
 } = storeToRefs(chatStore)
+
 const { sendMessage, clearMessages, loadNextPage, loadPreviousPage, initializeChat } = chatStore
 
-// Используем композабл анимаций
-const {
-  currentAnimation,
-  characterState,
-  handleMessageSent,
-  handleResponseStart,
-  handleResponseReceived,
-} = useAnimation()
-
 const handleSendMessage = async (message: string): Promise<void> => {
-  // Запускаем анимацию отправки сообщения
-  handleMessageSent(message)
-
-  // Отправляем сообщение в store
   await sendMessage(message)
 }
-
-// Отслеживаем изменения количества сообщений (более эффективно)
-watch(
-  () => messages.value.length,
-  (newLength, oldLength) => {
-    if (newLength > oldLength) {
-      const lastMessage = messages.value[newLength - 1]
-
-      if (lastMessage.sender === 'assistant' && !lastMessage.isTyping) {
-        handleResponseReceived(lastMessage.content)
-      }
-    }
-  },
-)
-
-// Отслеживаем состояние загрузки
-watch(isLoading, (loading) => {
-  if (loading) {
-    handleResponseStart()
-  }
-})
 
 onMounted(() => {
   initializeChat()
@@ -180,20 +143,6 @@ onMounted(() => {
 
   &__input {
     // MessageInput компонент имеет свои стили
-  }
-}
-
-.character-placeholder {
-  text-align: center;
-  color: $text-secondary;
-
-  &__avatar {
-    font-size: 4rem;
-    margin-bottom: 16px;
-  }
-
-  &__text {
-    font-size: 1rem;
   }
 }
 </style>

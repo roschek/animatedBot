@@ -5,9 +5,11 @@
     <div v-if="showDebug" class="spine-character__debug">
       <p>Current: {{ currentAnimation }}</p>
       <p>Speaking: {{ isSpeaking }}</p>
-      <p>Queue: {{ animationQueue.length }}</p>
+      <p>Speed: {{ speechSpeed }}ms</p>
+      <p>Text: "{{ currentText.slice(0, 20) }}..."</p>
       <button @click="testSpeech" class="debug-btn">Test Speech</button>
       <button @click="playRandomAnimation" class="debug-btn">Random Anim</button>
+      <button @click="toggleSpeed" class="debug-btn">Speed: {{ speechSpeed }}ms</button>
     </div>
   </div>
 </template>
@@ -34,8 +36,8 @@ const props = withDefaults(defineProps<Props>(), {
 const playerContainer = ref<HTMLElement | null>(null)
 const spinePlayer = ref<spine.SpinePlayer | null>(null)
 const currentAnimation = ref('loop_idle')
-const animationQueue = ref<string[]>([])
 const isAnimating = ref(false)
+const speechSpeed = ref(80) // Быстрее!
 
 const animationList = [
   'brows_angry',
@@ -62,19 +64,12 @@ const animationList = [
   'loop_walking',
 ]
 
-const speechAnimations = [
-  'lips_a_big',
-  'lips_a_small',
-  'lips_e',
-  'lips_i',
-  'lips_o',
-  'lips_u',
-  'lips_er',
-  'lips_m_p_b',
-  'lips_t_s_d_c',
-  'lips_v_f',
-  'lips_default_smile',
-]
+// Группы анимаций для более плавной речи
+const lipGroups = {
+  vowels: ['lips_a_big', 'lips_a_small', 'lips_e', 'lips_i', 'lips_o', 'lips_u'],
+  consonants: ['lips_m_p_b', 'lips_t_s_d_c', 'lips_v_f', 'lips_default_smile'],
+  neutral: ['lips_default_smile', 'lips_er'],
+}
 
 const containerStyles = computed(() => ({
   width: `${600 * props.scale}px`,
@@ -83,82 +78,50 @@ const containerStyles = computed(() => ({
   transformOrigin: 'center center',
 }))
 
-const textToAnimations = (text: string): string[] => {
-  const animations: string[] = []
-  const words = text.toLowerCase().split(' ')
+const getRandomFromGroup = (group: string[]): string => {
+  return group[Math.floor(Math.random() * group.length)]
+}
 
+const textToSpeechPattern = (text: string): string[] => {
+  const words = text.toLowerCase().trim().split(/\s+/)
+  const pattern: string[] = []
+
+  // Emotional setup based on text
+  if (text.includes('!')) {
+    pattern.push('brows_happy')
+  } else if (text.includes('?')) {
+    pattern.push('brows_default')
+  } else if (text.includes('sad') || text.includes('sorry')) {
+    pattern.push('brows_sad')
+  }
+
+  // Generate speech pattern - grouped by words, not letters
   words.forEach((word, wordIndex) => {
     if (wordIndex > 0) {
-      animations.push('eyelids_closed')
+      // Brief pause between words
+      pattern.push('lips_default_smile')
     }
 
-    for (let i = 0; i < word.length; i++) {
-      const char = word[i]
+    // Analyze word structure for lip movements
+    const vowelCount = (word.match(/[aeiou]/g) || []).length
+    const consonantCount = word.length - vowelCount
 
-      switch (char) {
-        case 'a':
-          animations.push(Math.random() > 0.5 ? 'lips_a_big' : 'lips_a_small')
-          break
-        case 'e':
-          animations.push('lips_e')
-          break
-        case 'i':
-          animations.push('lips_i')
-          break
-        case 'o':
-          animations.push('lips_o')
-          break
-        case 'u':
-          animations.push('lips_u')
-          break
-        case 'r':
-          animations.push('lips_er')
-          break
-        case 'm':
-        case 'p':
-        case 'b':
-          animations.push('lips_m_p_b')
-          break
-        case 't':
-        case 's':
-        case 'd':
-        case 'c':
-          animations.push('lips_t_s_d_c')
-          break
-        case 'v':
-        case 'f':
-          animations.push('lips_v_f')
-          break
-        case '?':
-          animations.push('brows_default')
-          break
-        case '!':
-          animations.push('brows_happy')
-          break
-        default:
-          if (/[bcdfghjklmnpqrstvwxyz]/.test(char)) {
-            animations.push('lips_default_smile')
-          }
+    // Generate realistic lip movements for the word
+    for (let i = 0; i < Math.max(2, Math.ceil(word.length / 2)); i++) {
+      if (Math.random() > 0.6) {
+        // Vowel sound
+        pattern.push(getRandomFromGroup(lipGroups.vowels))
+      } else if (Math.random() > 0.3) {
+        // Consonant sound
+        pattern.push(getRandomFromGroup(lipGroups.consonants))
+      } else {
+        // Neutral position
+        pattern.push(getRandomFromGroup(lipGroups.neutral))
       }
     }
   })
 
-  // Check for emotional context
-  const lowerText = text.toLowerCase()
-  if (lowerText.includes('sad') || lowerText.includes('sorry') || lowerText.includes('bad')) {
-    animations.unshift('brows_sad')
-  } else if (lowerText.includes('angry') || lowerText.includes('mad')) {
-    animations.unshift('brows_angry')
-  } else if (
-    lowerText.includes('happy') ||
-    lowerText.includes('great') ||
-    lowerText.includes('good')
-  ) {
-    animations.unshift('brows_happy')
-  }
-
-  animations.push('loop_idle')
-  return animations
+  return pattern
 }
 
 const playAnimation = (animationName: string) => {
@@ -168,46 +131,65 @@ const playAnimation = (animationName: string) => {
   }
 }
 
-const playAnimationSequence = async (animations: string[]) => {
-  if (isAnimating.value) return
+let speechTimeout: NodeJS.Timeout | null = null
 
+const speak = async (text: string) => {
+  if (!text.trim() || isAnimating.value) return
+
+  console.log('🗣️ Starting speech:', text)
   isAnimating.value = true
-  animationQueue.value = [...animations]
 
-  for (const animation of animations) {
+  const speechPattern = textToSpeechPattern(text)
+  const textDuration = text.length * 50 // 50ms per character
+  const animationInterval = Math.max(speechSpeed.value, textDuration / speechPattern.length)
+
+  console.log(`📊 Speech stats: ${speechPattern.length} animations over ${textDuration}ms`)
+
+  // Play speech pattern
+  for (let i = 0; i < speechPattern.length; i++) {
     if (!isAnimating.value) break
-    console.log('playing animation', animation)
+
+    const animation = speechPattern[i]
     playAnimation(animation)
-    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // Add some randomness to timing
+    const variance = speechSpeed.value * 0.3
+    const delay = speechSpeed.value + (Math.random() - 0.5) * variance
+
+    await new Promise((resolve) => setTimeout(resolve, delay))
   }
 
-  animationQueue.value = []
-  isAnimating.value = false
-  playAnimation('loop_idle')
-}
-
-const speak = (text: string) => {
-  if (!text.trim()) return
-
-  const animations = textToAnimations(text)
-  playAnimationSequence(animations)
+  // Return to idle after speech
+  if (isAnimating.value) {
+    playAnimation('loop_idle')
+    isAnimating.value = false
+  }
 }
 
 const stopSpeaking = () => {
+  console.log('🛑 Stopping speech')
   isAnimating.value = false
-  animationQueue.value = []
+  if (speechTimeout) {
+    clearTimeout(speechTimeout)
+    speechTimeout = null
+  }
   playAnimation('loop_idle')
 }
 
 const testSpeech = () => {
-  speak('Hello! How are you today?')
+  speak('Hello! How are you doing today? This is a test of the speech animation system!')
 }
 
 const playRandomAnimation = () => {
-  const randomAnim = speechAnimations[Math.floor(Math.random() * speechAnimations.length)]
+  const randomAnim = getRandomFromGroup(lipGroups.vowels.concat(lipGroups.consonants))
   playAnimation(randomAnim)
 }
 
+const toggleSpeed = () => {
+  speechSpeed.value = speechSpeed.value === 80 ? 50 : speechSpeed.value === 50 ? 120 : 80
+}
+
+// Watchers
 watch(
   () => props.currentText,
   (newText) => {
@@ -237,10 +219,10 @@ onMounted(() => {
       showControls: false,
       preserveDrawingBuffer: false,
       success: () => {
-        console.log('Spine animation loaded successfully')
+        console.log('✅ Spine animation loaded successfully')
       },
       error: (err) => {
-        console.error('Failed to load Spine animation:', err)
+        console.error('❌ Failed to load Spine animation:', err)
       },
     })
   }
@@ -257,7 +239,6 @@ defineExpose({
   speak,
   stopSpeaking,
   playAnimation,
-  playAnimationSequence,
 })
 </script>
 
@@ -276,12 +257,14 @@ defineExpose({
     position: absolute;
     top: 10px;
     left: 10px;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.9);
     color: white;
     padding: 12px;
     border-radius: 8px;
     font-family: monospace;
-    font-size: 12px;
+    font-size: 11px;
+    z-index: 10;
+    min-width: 200px;
 
     p {
       margin: 0 0 4px 0;
