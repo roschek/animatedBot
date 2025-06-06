@@ -4,12 +4,24 @@
 
     <div v-if="showDebug" class="spine-character__debug">
       <p><strong>Animation:</strong> {{ currentAnimation }}</p>
-      <p><strong>State:</strong> {{ internalState }} | <strong>Animating:</strong> {{ isAnimating ? '🎬' : '⏸️' }}</p>
-      <p><strong>Store:</strong> Loading: {{ isLoading ? '🔄' : '❌' }} | Responding: {{ isResponding ? '💬' : '❌' }}</p>
-      <p><strong>Text:</strong> "{{ currentResponseText.slice(0, 25) }}{{ currentResponseText.length > 25 ? '...' : '' }}"</p>
+      <p>
+        <strong>State:</strong> {{ internalState }} | <strong>Animating:</strong>
+        {{ isAnimating ? '🎬' : '⏸️' }}
+      </p>
+      <p>
+        <strong>Store:</strong> Loading: {{ isLoading ? '🔄' : '❌' }} | Responding:
+        {{ isResponding ? '💬' : '❌' }}
+      </p>
+      <p>
+        <strong>Text:</strong> "{{ currentResponseText.slice(0, 25)
+        }}{{ currentResponseText.length > 25 ? '...' : '' }}"
+      </p>
       <p><strong>Speed:</strong> {{ speechSpeed }}ms</p>
-      <p><strong>Timeouts:</strong> Loading: {{ loadingTimeout ? '⏱️' : '❌' }} | Responding: {{ respondingTimeout ? '⏱️' : '❌' }}</p>
-      <div style="margin-top: 8px;">
+      <p>
+        <strong>Timeouts:</strong> Loading: {{ loadingTimeout ? '⏱️' : '❌' }} | Responding:
+        {{ respondingTimeout ? '⏱️' : '❌' }}
+      </p>
+      <div style="margin-top: 8px">
         <button @click="testSpeech" class="debug-btn">Test Speech</button>
         <button @click="playRandomAnimation" class="debug-btn">Random Lip</button>
         <button @click="toggleSpeed" class="debug-btn">Speed: {{ speechSpeed }}</button>
@@ -55,12 +67,28 @@ let loadingTimeout: number | null = null
 let respondingTimeout: number | null = null
 
 const animationList = [
-  'brows_angry', 'brows_default', 'brows_happy', 'brows_sad',
-  'eyelids_bottop_closed', 'eyelids_closed', 'eyelids_upper_lowered',
-  'head_no', 'head_yes',
-  'lips_a_big', 'lips_a_small', 'lips_default_smile', 'lips_e', 'lips_er',
-  'lips_i', 'lips_m_p_b', 'lips_o', 'lips_u', 'lips_t_s_d_c', 'lips_v_f',
-  'loop_idle', 'loop_walking',
+  'brows_angry',
+  'brows_default',
+  'brows_happy',
+  'brows_sad',
+  'eyelids_bottop_closed',
+  'eyelids_closed',
+  'eyelids_upper_lowered',
+  'head_no',
+  'head_yes',
+  'lips_a_big',
+  'lips_a_small',
+  'lips_default_smile',
+  'lips_e',
+  'lips_er',
+  'lips_i',
+  'lips_m_p_b',
+  'lips_o',
+  'lips_u',
+  'lips_t_s_d_c',
+  'lips_v_f',
+  'loop_idle',
+  'loop_walking',
 ]
 
 const lipGroups = {
@@ -71,7 +99,7 @@ const lipGroups = {
 
 const containerStyles = computed(() => ({
   width: '600px',
-  height: '800px',
+  height: '700px',
   transform: props.scale !== 1 ? `scale(${props.scale})` : undefined,
   transformOrigin: 'center center',
 }))
@@ -82,7 +110,7 @@ const getRandomFromGroup = (group: string[]): string => {
 
 const textToSpeechPattern = (text: string): string[] => {
   const pattern: string[] = []
-  
+
   // Emotional setup based on text
   if (text.includes('!')) {
     pattern.push('brows_happy')
@@ -93,8 +121,8 @@ const textToSpeechPattern = (text: string): string[] => {
   }
 
   // Split by sentences first, then by words
-  const sentences = text.split(/([.!?;:])/g).filter(sentence => sentence.trim())
-  
+  const sentences = text.split(/([.!?;:])/g).filter((sentence) => sentence.trim())
+
   sentences.forEach((sentence, sentenceIndex) => {
     // Skip standalone punctuation
     if (/^[.!?;:]+$/.test(sentence.trim())) {
@@ -104,8 +132,11 @@ const textToSpeechPattern = (text: string): string[] => {
       return
     }
 
-    const words = sentence.trim().split(/\s+/).filter(word => word.length > 0)
-    
+    const words = sentence
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0)
+
     words.forEach((word, wordIndex) => {
       if (wordIndex > 0) {
         // Pause between words
@@ -143,13 +174,16 @@ const smoothTransitionTo = async (targetAnimation: string, transitionDelay: numb
     playAnimation(targetAnimation)
     return
   }
-  
+
   // Для речевых анимаций - используем промежуточную анимацию
-  if (currentAnimation.value !== 'lips_default_smile' && targetAnimation !== currentAnimation.value) {
+  if (
+    currentAnimation.value !== 'lips_default_smile' &&
+    targetAnimation !== currentAnimation.value
+  ) {
     playAnimation('lips_default_smile')
-    await new Promise(resolve => setTimeout(resolve, transitionDelay))
+    await new Promise((resolve) => setTimeout(resolve, transitionDelay))
   }
-  
+
   playAnimation(targetAnimation)
 }
 
@@ -157,15 +191,15 @@ const speak = async (text: string) => {
   if (!text.trim()) return
 
   console.log('🗣️ Starting speech:', text)
-  
+
   // Прерываем thinking если нужно
   if (internalState.value === 'thinking') {
     console.log('🤔→💬 Transitioning from thinking to speaking')
   }
-  
+
   isAnimating.value = true
   internalState.value = 'speaking'
-  
+
   const speechPattern = textToSpeechPattern(text)
 
   // Play speech pattern
@@ -177,30 +211,30 @@ const speak = async (text: string) => {
 
     // Более длинные паузы для плавности
     let delay = speechSpeed.value
-    
+
     // Увеличиваем паузы для определенных анимаций
     if (animation === 'lips_default_smile') {
       delay = speechSpeed.value * 1.5 // Длинные паузы между словами
     } else if (animation.includes('brows_')) {
       delay = speechSpeed.value * 2 // Эмоциональные выражения держим дольше
     }
-    
+
     // Добавляем небольшую случайность
     const variance = delay * 0.2
     delay = delay + (Math.random() - 0.5) * variance
 
-    await new Promise(resolve => setTimeout(resolve, delay))
+    await new Promise((resolve) => setTimeout(resolve, delay))
   }
 
   // Плавное завершение речи
   if (isAnimating.value) {
     isAnimating.value = false
     internalState.value = 'idle'
-    
+
     // Промежуточная пауза перед возвратом к idle
     playAnimation('lips_default_smile')
-    await new Promise(resolve => setTimeout(resolve, 400))
-    
+    await new Promise((resolve) => setTimeout(resolve, 400))
+
     await smoothTransitionTo('loop_idle', 300)
     console.log('✅ Speech finished, smoothly back to idle')
   }
@@ -261,19 +295,20 @@ const forceWalking = () => {
 // 🎯 АВТОНОМНЫЕ WATCHERS - следят за store с плавными переходами
 watch(isLoading, (loading) => {
   console.log('📊 Store isLoading changed:', loading)
-  
+
   // Очищаем предыдущий timeout
   if (loadingTimeout) {
     clearTimeout(loadingTimeout)
     loadingTimeout = null
   }
-  
+
   if (loading) {
     startThinking() // Сразу запускаем думание
   } else {
     // Небольшая задержка перед остановкой, чтобы избежать "мигания"
     loadingTimeout = setTimeout(() => {
-      if (!isLoading.value) { // Проверяем что состояние не изменилось
+      if (!isLoading.value) {
+        // Проверяем что состояние не изменилось
         stopThinking()
       }
       loadingTimeout = null
@@ -283,17 +318,18 @@ watch(isLoading, (loading) => {
 
 watch(isResponding, (responding) => {
   console.log('📊 Store isResponding changed:', responding)
-  
+
   // Очищаем предыдущий timeout
   if (respondingTimeout) {
     clearTimeout(respondingTimeout)
     respondingTimeout = null
   }
-  
+
   if (!responding) {
     // Задержка перед остановкой речи для естественности
     respondingTimeout = setTimeout(() => {
-      if (!isResponding.value) { // Проверяем что состояние не изменилось
+      if (!isResponding.value) {
+        // Проверяем что состояние не изменилось
         stopSpeaking()
       }
       respondingTimeout = null
@@ -305,8 +341,9 @@ watch(currentResponseText, async (text) => {
   console.log('📊 Store currentResponseText changed:', text)
   if (text && isResponding.value) {
     // Небольшая пауза перед началом речи
-    await new Promise(resolve => setTimeout(resolve, 150))
-    if (text && isResponding.value) { // Проверяем что состояние не изменилось
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    if (text && isResponding.value) {
+      // Проверяем что состояние не изменилось
       speak(text)
     }
   }
@@ -336,7 +373,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopSpeaking()
-  
+
   // Очищаем все timeouts
   if (loadingTimeout) {
     clearTimeout(loadingTimeout)
@@ -346,7 +383,7 @@ onUnmounted(() => {
     clearTimeout(respondingTimeout)
     respondingTimeout = null
   }
-  
+
   if (spinePlayer.value) {
     spinePlayer.value.dispose()
   }
@@ -372,20 +409,17 @@ defineExpose({
   &__player {
     // Жёсткая фиксация размера
     overflow: hidden;
-    
+
     :deep(canvas) {
-      width: 600px !important;
-      height: 800px !important;
-      max-width: 600px !important;
-      max-height: 800px !important;
-      min-width: 600px !important;
-      min-height: 800px !important;
+      width: 600px;
+      height: 700px;
+
       object-fit: contain;
     }
-    
+
     :deep(.spine-player-container) {
-      width: 600px !important;
-      height: 800px !important;
+      width: 600px;
+      height: 700px;
     }
   }
 

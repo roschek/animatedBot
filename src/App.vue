@@ -11,8 +11,7 @@ import { RouterView } from 'vue-router'
 </script>
 
 <style lang="scss" scoped>
-.app {
-  height: 90vh;
+.app { 
   display: flex;
   flex-direction: column;
 
