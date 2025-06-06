@@ -123,7 +123,7 @@ const textToSpeechPattern = (text: string): string[] => {
   // Split by sentences first, then by words
   const sentences = text.split(/([.!?;:])/g).filter((sentence) => sentence.trim())
 
-  sentences.forEach((sentence, sentenceIndex) => {
+  sentences.forEach((sentence) => {
     // Skip standalone punctuation
     if (/^[.!?;:]+$/.test(sentence.trim())) {
       // Pause after punctuation

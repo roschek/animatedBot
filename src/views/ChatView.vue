@@ -115,7 +115,6 @@ onMounted(() => {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    min-height: 400px;
   }
 
   &__animation {
