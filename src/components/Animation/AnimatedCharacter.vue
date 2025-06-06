@@ -35,9 +35,9 @@ const props = withDefaults(defineProps<Props>(), {
 
 const playerContainer = ref<HTMLElement | null>(null)
 const spinePlayer = ref<spine.SpinePlayer | null>(null)
-const currentAnimation = ref('loop_idle')
+const currentAnimation = ref('loop_walking')
 const isAnimating = ref(false)
-const speechSpeed = ref(80) // Быстрее!
+const speechSpeed = ref(50)
 
 const animationList = [
   'brows_angry',
@@ -64,7 +64,6 @@ const animationList = [
   'loop_walking',
 ]
 
-// Группы анимаций для более плавной речи
 const lipGroups = {
   vowels: ['lips_a_big', 'lips_a_small', 'lips_e', 'lips_i', 'lips_o', 'lips_u'],
   consonants: ['lips_m_p_b', 'lips_t_s_d_c', 'lips_v_f', 'lips_default_smile'],
@@ -72,8 +71,8 @@ const lipGroups = {
 }
 
 const containerStyles = computed(() => ({
-  width: `${600 * props.scale}px`,
-  height: `${800 * props.scale}px`,
+  width: '600px',
+  height: '800px',
   transform: props.scale !== 1 ? `scale(${props.scale})` : undefined,
   transformOrigin: 'center center',
 }))
@@ -86,7 +85,6 @@ const textToSpeechPattern = (text: string): string[] => {
   const words = text.toLowerCase().trim().split(/\s+/)
   const pattern: string[] = []
 
-  // Emotional setup based on text
   if (text.includes('!')) {
     pattern.push('brows_happy')
   } else if (text.includes('?')) {
@@ -102,12 +100,7 @@ const textToSpeechPattern = (text: string): string[] => {
       pattern.push('lips_default_smile')
     }
 
-    // Analyze word structure for lip movements
-    const vowelCount = (word.match(/[aeiou]/g) || []).length
-    const consonantCount = word.length - vowelCount
-
-    // Generate realistic lip movements for the word
-    for (let i = 0; i < Math.max(2, Math.ceil(word.length / 2)); i++) {
+     for (let i = 0; i < Math.max(2, Math.ceil(word.length / 2)); i++) {
       if (Math.random() > 0.6) {
         // Vowel sound
         pattern.push(getRandomFromGroup(lipGroups.vowels))
@@ -131,20 +124,16 @@ const playAnimation = (animationName: string) => {
   }
 }
 
-let speechTimeout: NodeJS.Timeout | null = null
+let speechTimeout: number | null = null
 
 const speak = async (text: string) => {
   if (!text.trim() || isAnimating.value) return
 
   console.log('🗣️ Starting speech:', text)
   isAnimating.value = true
-
   const speechPattern = textToSpeechPattern(text)
-  const textDuration = text.length * 50 // 50ms per character
-  const animationInterval = Math.max(speechSpeed.value, textDuration / speechPattern.length)
-
-  console.log(`📊 Speech stats: ${speechPattern.length} animations over ${textDuration}ms`)
-
+  
+ 
   // Play speech pattern
   for (let i = 0; i < speechPattern.length; i++) {
     if (!isAnimating.value) break
@@ -213,7 +202,7 @@ onMounted(() => {
     spinePlayer.value = new spine.SpinePlayer(playerContainer.value, {
       skeleton: '/assets/Baby_Friend42.json',
       atlas: '/assets/Baby_Friend42.atlas',
-      animation: 'loop_idle',
+      animation: 'loop_walking',
       backgroundColor: '#00000000',
       alpha: true,
       showControls: false,
@@ -248,10 +237,6 @@ defineExpose({
   display: flex;
   flex-direction: column;
   align-items: center;
-
-  &__player {
-    transition: transform 0.3s ease;
-  }
 
   &__debug {
     position: absolute;
