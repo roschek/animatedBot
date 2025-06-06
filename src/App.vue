@@ -12,7 +12,7 @@ import { RouterView } from 'vue-router'
 
 <style lang="scss" scoped>
 .app {
-  min-height: 100vh;
+  height: 90vh;
   display: flex;
   flex-direction: column;
 
