@@ -197,9 +197,7 @@ const parseEmotions = (
 
   return { cleanText, emotions }
 }
-const playEmotion = (emotion: string) => {
-  console.log('🎭 Playing emotion:', emotion)
-
+const playEmotion = (emotion: string) => { 
   switch (emotion.toLowerCase()) {
     case 'happy':
       playFaceAnimation('brows_happy')
