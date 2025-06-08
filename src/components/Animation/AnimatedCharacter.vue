@@ -28,6 +28,11 @@ const isAnimating = ref(false)
 const speechSpeed = ref(120)
 const internalState = ref<'idle' | 'thinking' | 'speaking'>('idle')
 
+const isSpeechEnabled = ref(true)
+const speechRate = ref(1.0)
+const speechPitch = ref(1.2)
+let currentUtterance: SpeechSynthesisUtterance | null = null
+
 let loadingTimeout: number | null = null
 let respondingTimeout: number | null = null
 
@@ -47,6 +52,50 @@ const containerStyles = computed(() => ({
   transform: props.scale !== 1 ? `scale(${props.scale})` : undefined,
   transformOrigin: 'center center',
 }))
+
+//speech
+const speakText = (text: string) => {
+  if (!isSpeechEnabled.value || !window.speechSynthesis) return
+
+  stopSpeech()
+  currentUtterance = new SpeechSynthesisUtterance(text)
+
+  const voices = speechSynthesis.getVoices()
+  const preferredVoices = [
+    'Google UK English Female',
+    'Google US English Female',
+    'Microsoft Zira Desktop',
+    'Samantha',
+    ...voices.filter((v) => v.lang.includes('en-') && v.name.toLowerCase().includes('female')),
+  ]
+
+  let selectedVoice = null
+  for (const voiceName of preferredVoices) {
+    selectedVoice = voices.find((v) => v.name === voiceName)
+    if (selectedVoice) break
+  }
+
+  if (selectedVoice) {
+    currentUtterance.voice = selectedVoice
+    console.log('🎤 Using voice:', selectedVoice.name)
+  }
+  currentUtterance.rate = speechRate.value
+  currentUtterance.pitch = speechPitch.value
+  currentUtterance.volume = 0.7
+
+  currentUtterance.onend = () => {
+    currentUtterance = null
+  }
+
+  speechSynthesis.speak(currentUtterance)
+}
+
+const stopSpeech = () => {
+  if (speechSynthesis.speaking) {
+    speechSynthesis.cancel()
+  }
+  currentUtterance = null
+}
 
 const getRandomFromGroup = (group: string[]): string => {
   return group[Math.floor(Math.random() * group.length)]
@@ -117,6 +166,8 @@ const speak = async (text: string) => {
   isAnimating.value = true
   internalState.value = 'speaking'
 
+  speakText(text)
+
   const speechPattern = textToSpeechPattern(text)
 
   for (let i = 0; i < speechPattern.length; i++) {
@@ -144,6 +195,7 @@ const speak = async (text: string) => {
 const stopSpeaking = () => {
   isAnimating.value = false
   internalState.value = 'idle'
+  stopSpeech()
   clearFaceAnimation()
 }
 
@@ -213,6 +265,9 @@ onMounted(() => {
       success: () => {
         playBaseAnimation('loop_idle', true)
         clearFaceAnimation()
+        speechSynthesis.onvoiceschanged = () => {
+          console.log('🎤 Voices loaded')
+        }
       },
       error: (err) => {
         console.error('Failed to load Spine animation:', err)
@@ -223,7 +278,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopSpeaking()
-
+  stopSpeech()
   if (loadingTimeout) clearTimeout(loadingTimeout)
   if (respondingTimeout) clearTimeout(respondingTimeout)
 
@@ -233,6 +288,8 @@ onUnmounted(() => {
 defineExpose({
   speak,
   stopSpeaking,
+  speakText,
+  stopSpeech,
   playBaseAnimation,
   playFaceAnimation,
 })

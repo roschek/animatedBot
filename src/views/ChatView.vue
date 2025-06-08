@@ -48,10 +48,7 @@ const { paginatedMessages, totalMessages, currentPage, totalPages, hasMoreMessag
 
 const { sendMessage, clearMessages, loadNextPage, loadPreviousPage, initializeChat } = chatStore
 
-const handleSendMessage = async (message: string): Promise<void> => {
-  console.log('💬 ChatView: Sending message:', message)
-  await sendMessage(message)
-}
+const handleSendMessage = async (message: string): Promise<void> => await sendMessage(message)
 
 onMounted(() => initializeChat())
 </script>
