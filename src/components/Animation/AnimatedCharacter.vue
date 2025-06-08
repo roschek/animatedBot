@@ -11,7 +11,6 @@ import { useChatStore } from '@/stores/chat'
 import '@esotericsoftware/spine-player/dist/spine-player.css'
 import * as spine from '@esotericsoftware/spine-player'
 
-
 interface Props {
   scale?: number
 }
@@ -22,7 +21,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const chatStore = useChatStore()
 const { isLoading, isResponding, currentResponseText } = storeToRefs(chatStore)
-
 
 const playerContainer = ref<HTMLElement | null>(null)
 const spinePlayer = ref<spine.SpinePlayer | null>(null)
@@ -75,17 +73,18 @@ const clearFaceAnimation = () => {
 const textToSpeechPattern = (text: string): string[] => {
   const pattern: string[] = []
 
-  
-  if (text.includes('!')) pattern.push('brows_happy')
-  else if (text.includes('?')) pattern.push('brows_default')
-  else if (text.includes('sad') || text.includes('sorry')) pattern.push('brows_sad')
-
-  
   const sentences = text.split(/([.!?;:])/g).filter((sentence) => sentence.trim())
 
   sentences.forEach((sentence) => {
+    if (sentence.includes('!')) {
+      pattern.push('brows_happy')
+    } else if (sentence.includes('?')) {
+      pattern.push('brows_default')
+    } else if (sentence.includes('sad') || sentence.includes('sorry')) {
+      pattern.push('brows_sad')
+    }
     if (/^[.!?;:]+$/.test(sentence.trim())) {
-      pattern.push('lips_default_smile', 'lips_default_smile') 
+      pattern.push('lips_default_smile', 'lips_default_smile')
       return
     }
 
@@ -95,7 +94,7 @@ const textToSpeechPattern = (text: string): string[] => {
       .filter((word) => word.length > 0)
 
     words.forEach((word, wordIndex) => {
-      if (wordIndex > 0) pattern.push('lips_default_smile') 
+      if (wordIndex > 0) pattern.push('lips_default_smile')
 
       for (let i = 0; i < Math.max(2, Math.ceil(word.length / 2)); i++) {
         if (Math.random() > 0.6) {
@@ -130,7 +129,7 @@ const speak = async (text: string) => {
     if (animation === 'lips_default_smile') delay *= 1.5
     else if (animation.includes('brows_')) delay *= 2
 
-    delay += (Math.random() - 0.5) * delay * 0.2 
+    delay += (Math.random() - 0.5) * delay * 0.2
 
     await new Promise((resolve) => setTimeout(resolve, delay))
   }
