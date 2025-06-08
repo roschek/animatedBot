@@ -9,6 +9,7 @@ export const useChatStore = defineStore('chat', (): ChatStore => {
   const messagesPerPage = ref<number>(50)
   const isResponding = ref<boolean>(false)
   const currentResponseText = ref<string>('')
+  
 
   const totalMessages = computed((): number => messages.value.length)
   const totalPages = computed((): number => Math.ceil(totalMessages.value / messagesPerPage.value))

@@ -57,7 +57,7 @@ export interface MessageListProps {
   hasMoreMessages: boolean
 }
 
-export interface MessageInputProps {  
+export interface MessageInputProps {
   maxLength: number
 }
 

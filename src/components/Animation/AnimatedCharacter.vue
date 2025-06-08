@@ -25,12 +25,9 @@ const { isLoading, isResponding, currentResponseText } = storeToRefs(chatStore)
 const playerContainer = ref<HTMLElement | null>(null)
 const spinePlayer = ref<spine.SpinePlayer | null>(null)
 const isAnimating = ref(false)
-const speechSpeed = ref(120)
 const internalState = ref<'idle' | 'thinking' | 'speaking'>('idle')
 
 const isSpeechEnabled = ref(true)
-const speechRate = ref(1.0)
-const speechPitch = ref(1.2)
 let currentUtterance: SpeechSynthesisUtterance | null = null
 
 let loadingTimeout: number | null = null
@@ -54,61 +51,28 @@ const containerStyles = computed(() => ({
 }))
 
 //speech
-const speakText = (text: string) => {
-  if (!isSpeechEnabled.value || !window.speechSynthesis) return
+const speakText = (audio: HTMLAudioElement) => {
+  if (!isSpeechEnabled.value) return
 
-  stopSpeech()
-
-  const voices = speechSynthesis.getVoices()
-  if (voices.length === 0) {
-    speechSynthesis.onvoiceschanged = () => {
-      speakText(text)
-    }
-    return
-  }
-
-  currentUtterance = new SpeechSynthesisUtterance(text)
-
-  const femaleVoices = voices.filter((voice) => {
-    const name = voice.name.toLowerCase()
-    const isFemale =
-      name.includes('female') ||
-      name.includes('woman') ||
-      name.includes('zira') ||
-      name.includes('samantha') ||
-      name.includes('susan') ||
-      name.includes('karen') ||
-      name.includes('kate')
-    const isEnglish = voice.lang.includes('en')
-    return isFemale && isEnglish
-  })
-
-  const selectedVoice =
-    femaleVoices.find((v) => v.name.includes('Google')) ||
-    femaleVoices.find((v) => v.name.includes('Microsoft')) ||
-    femaleVoices[0]
-
-  if (selectedVoice) {
-    currentUtterance.voice = selectedVoice
-    console.log('🎤 Selected female voice:', selectedVoice.name)
-  } else {
-    console.warn('⚠️ No female voice found, using default')
-  }
-
-  currentUtterance.rate = speechRate.value
-  currentUtterance.pitch = speechPitch.value
-  currentUtterance.volume = 0.7
-
-  currentUtterance.onend = () => {
+  audio.onended = () => {
     currentUtterance = null
   }
 
-  speechSynthesis.speak(currentUtterance)
+  audio.onerror = () => {
+    currentUtterance = null
+    console.error('Audio playback failed')
+  }
+
+  audio.play()
 }
 
 const stopSpeech = () => {
-  if (speechSynthesis.speaking) {
-    speechSynthesis.cancel()
+  if (currentUtterance) {
+    if (currentUtterance instanceof Audio) {
+      currentUtterance.pause()
+    } else if (speechSynthesis.speaking) {
+      speechSynthesis.cancel()
+    }
   }
   currentUtterance = null
 }
@@ -197,7 +161,7 @@ const parseEmotions = (
 
   return { cleanText, emotions }
 }
-const playEmotion = (emotion: string) => { 
+const playEmotion = (emotion: string) => {
   switch (emotion.toLowerCase()) {
     case 'happy':
       playFaceAnimation('brows_happy')
@@ -225,22 +189,104 @@ const playEmotion = (emotion: string) => {
       console.log('Unknown emotion:', emotion)
   }
 }
+const loadAudio = async (text: string): Promise<HTMLAudioElement | null> => {
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+
+    if (!response.ok) throw new Error('TTS failed')
+
+    const audioBlob = await response.blob()
+    const audio = new Audio(URL.createObjectURL(audioBlob))
+
+    return new Promise((resolve, reject) => {
+      audio.oncanplaythrough = () => resolve(audio)
+      audio.onerror = () => reject(new Error('Audio load failed'))
+      audio.load()
+    })
+  } catch (error) {
+    console.error('TTS loading error:', error)
+    return null
+  }
+}
 const speak = async (text: string) => {
   if (!text.trim()) return
 
   const { cleanText, emotions } = parseEmotions(text)
 
+  const audio = await loadAudio(cleanText)
+  if (!audio) return
+
+  // Ждем загрузки метаданных аудио чтобы получить длительность
+  await new Promise((resolve) => {
+    if (audio.readyState >= 1) {
+      resolve(undefined)
+    } else {
+      audio.onloadedmetadata = () => resolve(undefined)
+    }
+  })
+
+  const audioDuration = audio.duration * 1000 // в миллисекундах
+  console.log('🔊 Audio duration:', audioDuration, 'ms')
+
   isAnimating.value = true
   internalState.value = 'speaking'
 
-  speakText(cleanText)
-
-  await new Promise((resolve) => setTimeout(resolve, 300))
-
   const speechPattern = textToSpeechPattern(cleanText)
+  const totalFrames = speechPattern.length
+
+  const frameDelay = Math.max(50, audioDuration / totalFrames)
+  console.log('🎭 Frame delay calculated:', frameDelay, 'ms')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  currentUtterance = audio as any
+
+  audio.onended = () => {
+    console.log('🔊 Audio ended, stopping animation')
+    isAnimating.value = false
+    internalState.value = 'idle'
+    clearFaceAnimation()
+    currentUtterance = null
+  }
+
+  audio.onerror = () => {
+    console.error('🔊 Audio error, stopping animation')
+    isAnimating.value = false
+    internalState.value = 'idle'
+    clearFaceAnimation()
+    currentUtterance = null
+  }
+
+  const audioStartPromise = new Promise<void>((resolve) => {
+    const onPlaying = () => {
+      console.log('🔊 Audio actually started playing')
+      audio.removeEventListener('playing', onPlaying)
+      resolve()
+    }
+    audio.addEventListener('playing', onPlaying)
+  })
+
+  console.log('🔊 Starting audio...')
+  audio.play()
+
+  await audioStartPromise
+  console.log('🎭 Starting animation synchronized with audio')
+
+  const startTime = Date.now()
+
   let currentPosition = 0
   for (let i = 0; i < speechPattern.length; i++) {
-    if (!isAnimating.value) break
+    if (!isAnimating.value || !audio || audio.ended || audio.paused) break
+
+    const expectedTime = i * frameDelay
+    const elapsedTime = Date.now() - startTime
+
+    if (elapsedTime < expectedTime) {
+      await new Promise((resolve) => setTimeout(resolve, expectedTime - elapsedTime))
+    }
 
     const animation = speechPattern[i]
     const emotion = emotions.find((e) => Math.abs(e.position - currentPosition) < 5)
@@ -249,21 +295,13 @@ const speak = async (text: string) => {
       playEmotion(emotion.emotion)
       emotions.splice(emotions.indexOf(emotion), 1)
     }
+
     playFaceAnimation(animation)
-
-    let delay = speechSpeed.value
-    if (animation === 'lips_default_smile') delay *= 1.5
-    else if (animation.includes('brows_')) delay *= 2
-
-    delay += (Math.random() - 0.5) * delay * 0.2
     currentPosition += 1
-    await new Promise((resolve) => setTimeout(resolve, delay))
   }
 
-  if (isAnimating.value) {
-    isAnimating.value = false
-    internalState.value = 'idle'
-    clearFaceAnimation()
+  if (isAnimating.value && !audio.ended) {
+    console.log('🎭 Animation finished, waiting for audio to end')
   }
 }
 
