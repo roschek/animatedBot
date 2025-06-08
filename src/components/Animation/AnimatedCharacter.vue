@@ -57,32 +57,46 @@ const containerStyles = computed(() => ({
 const speakText = (text: string) => {
   if (!isSpeechEnabled.value || !window.speechSynthesis) return
 
-  stopSpeech()
-  currentUtterance = new SpeechSynthesisUtterance(text)
-
+  stopSpeech()  
+  
   const voices = speechSynthesis.getVoices()
-  const preferredVoices = [
-    'Google UK English Female',
-    'Google US English Female',
-    'Microsoft Zira Desktop',
-    'Samantha',
-    ...voices.filter((v) => v.lang.includes('en-') && v.name.toLowerCase().includes('female')),
-  ]
-
-  let selectedVoice = null
-  for (const voiceName of preferredVoices) {
-    selectedVoice = voices.find((v) => v.name === voiceName)
-    if (selectedVoice) break
+  if (voices.length === 0) {
+    speechSynthesis.onvoiceschanged = () => {
+      speakText(text) 
+    }
+    return
   }
 
+  currentUtterance = new SpeechSynthesisUtterance(text)
+  
+  const femaleVoices = voices.filter(voice => {
+    const name = voice.name.toLowerCase()
+    const isFemale = name.includes('female') || 
+                    name.includes('woman') || 
+                    name.includes('zira') || 
+                    name.includes('samantha') ||
+                    name.includes('susan') ||
+                    name.includes('karen') ||
+                    name.includes('kate')
+    const isEnglish = voice.lang.includes('en')
+    return isFemale && isEnglish
+  })  
+  
+  const selectedVoice = femaleVoices.find(v => v.name.includes('Google')) ||
+                     femaleVoices.find(v => v.name.includes('Microsoft')) ||
+                     femaleVoices[0]
+  
   if (selectedVoice) {
     currentUtterance.voice = selectedVoice
-    console.log('🎤 Using voice:', selectedVoice.name)
+    console.log('🎤 Selected female voice:', selectedVoice.name)
+  } else {
+    console.warn('⚠️ No female voice found, using default')
   }
+  
   currentUtterance.rate = speechRate.value
   currentUtterance.pitch = speechPitch.value
   currentUtterance.volume = 0.7
-
+  
   currentUtterance.onend = () => {
     currentUtterance = null
   }
@@ -164,10 +178,12 @@ const speak = async (text: string) => {
   if (!text.trim()) return
 
   isAnimating.value = true
-  internalState.value = 'speaking'
-
+  internalState.value = 'speaking'  
+  
   speakText(text)
-
+  
+  await new Promise(resolve => setTimeout(resolve, 300))
+  
   const speechPattern = textToSpeechPattern(text)
 
   for (let i = 0; i < speechPattern.length; i++) {
@@ -179,10 +195,10 @@ const speak = async (text: string) => {
     let delay = speechSpeed.value
     if (animation === 'lips_default_smile') delay *= 1.5
     else if (animation.includes('brows_')) delay *= 2
-
+    
     delay += (Math.random() - 0.5) * delay * 0.2
 
-    await new Promise((resolve) => setTimeout(resolve, delay))
+    await new Promise(resolve => setTimeout(resolve, delay))
   }
 
   if (isAnimating.value) {
