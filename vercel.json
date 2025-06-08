@@ -1,6 +1,7 @@
 {
   "functions": {
     "api/chat.ts": {
+      "runtime": "@vercel/node@3",
       "maxDuration": 30
     }
   }
