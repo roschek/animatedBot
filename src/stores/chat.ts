@@ -61,32 +61,58 @@ export const useChatStore = defineStore('chat', (): ChatStore => {
     if (!content.trim()) return
 
     isLoading.value = true
-
-    addMessage(content, 'user')
+    const userMessage = addMessage(content, 'user')
     addTypingMessage()
 
     try {
-      await new Promise<void>((resolve) => setTimeout(resolve, 800 + Math.random() * 1200))
+      
+      const history = messages.value
+        .slice(-10)
+        .filter((msg) => !msg.isTyping && msg.id !== userMessage.id)
+        .map((msg) => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+        }))
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: content,
+          history,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
 
       removeTypingMessage()
-
-      const echoResponse = content
-      currentResponseText.value = echoResponse
+      const parseEmotions = (text: string) => {
+        return text.replace(/\[EMOTION:\w+\]/g, '').trim()
+      }
+      const cleanResponse = parseEmotions(data.response)
+      const fullResponse = data.response
+      currentResponseText.value = fullResponse
       isResponding.value = true
 
-      addMessage(echoResponse, 'assistant')
-
+      addMessage(cleanResponse, 'assistant')
+      
       setTimeout(
         () => {
           isResponding.value = false
           currentResponseText.value = ''
         },
-        echoResponse.length * 200 + 1000,
+        data.response.length * 80 + 2000,
       )
     } catch (error) {
       removeTypingMessage()
-      addMessage("Sorry, I'm having trouble responding right now. Please try again.", 'assistant')
-      console.error('Error sending message:', error)
+      addMessage("I'm having trouble connecting right now. Please try again!", 'assistant')
+      console.error('API error:', error)
     } finally {
       isLoading.value = false
     }

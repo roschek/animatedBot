@@ -175,23 +175,82 @@ const textToSpeechPattern = (text: string): string[] => {
 
   return pattern
 }
+const parseEmotions = (
+  text: string,
+): { cleanText: string; emotions: Array<{ position: number; emotion: string }> } => {
+  const emotions: Array<{ position: number; emotion: string }> = []
+  let cleanText = text
+  let offset = 0
 
+  const emotionRegex = /\[EMOTION:(\w+)\]/g
+  let match
+
+  while ((match = emotionRegex.exec(text)) !== null) {
+    const emotion = match[1]
+    const position = match.index - offset
+
+    emotions.push({ position, emotion })
+
+    cleanText = cleanText.replace(match[0], '')
+    offset += match[0].length
+  }
+
+  return { cleanText, emotions }
+}
+const playEmotion = (emotion: string) => {
+  console.log('🎭 Playing emotion:', emotion)
+
+  switch (emotion.toLowerCase()) {
+    case 'happy':
+      playFaceAnimation('brows_happy')
+      setTimeout(() => playFaceAnimation('lips_default_smile'), 500)
+      break
+    case 'sad':
+      playFaceAnimation('brows_sad')
+      setTimeout(() => playFaceAnimation('lips_default_smile'), 800)
+      break
+    case 'thinking':
+      playFaceAnimation('brows_default')
+      playFaceAnimation('eyelids_upper_lowered')
+      break
+    case 'surprised':
+      playFaceAnimation('brows_happy')
+      playFaceAnimation('eyelids_bottop_closed')
+      break
+    case 'waving':
+      playFaceAnimation('brows_happy')
+      break
+    case 'neutral':
+      clearFaceAnimation()
+      break
+    default:
+      console.log('Unknown emotion:', emotion)
+  }
+}
 const speak = async (text: string) => {
   if (!text.trim()) return
+
+  const { cleanText, emotions } = parseEmotions(text)
 
   isAnimating.value = true
   internalState.value = 'speaking'
 
-  speakText(text)
+  speakText(cleanText)
 
   await new Promise((resolve) => setTimeout(resolve, 300))
 
-  const speechPattern = textToSpeechPattern(text)
-
+  const speechPattern = textToSpeechPattern(cleanText)
+  let currentPosition = 0
   for (let i = 0; i < speechPattern.length; i++) {
     if (!isAnimating.value) break
 
     const animation = speechPattern[i]
+    const emotion = emotions.find((e) => Math.abs(e.position - currentPosition) < 5)
+
+    if (emotion) {
+      playEmotion(emotion.emotion)
+      emotions.splice(emotions.indexOf(emotion), 1)
+    }
     playFaceAnimation(animation)
 
     let delay = speechSpeed.value
@@ -199,7 +258,7 @@ const speak = async (text: string) => {
     else if (animation.includes('brows_')) delay *= 2
 
     delay += (Math.random() - 0.5) * delay * 0.2
-
+    currentPosition += 1
     await new Promise((resolve) => setTimeout(resolve, delay))
   }
 
