@@ -38,7 +38,6 @@ export async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Claude API error:', error)
     return res.status(500).json({
       error: 'API Error',
-      details: error?.message,
     })
   }
 }

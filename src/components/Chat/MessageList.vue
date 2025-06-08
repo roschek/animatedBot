@@ -24,6 +24,13 @@
           <ChatMessage v-for="message in messages" :key="message.id" :message="message" />
         </TransitionGroup>
 
+        <!-- Читаем текущую речь напрямую из store -->
+        <Transition name="current-response" mode="out-in">
+          <div v-if="shouldShowCurrentSpeech" key="current-response" class="message-list__current">
+            <ChatMessage :message="currentSpeechMessage" />
+          </div>
+        </Transition>
+
         <div v-if="messages.length === 0" class="message-list__empty">
           <div class="message-list__empty-icon">💬</div>
           <p class="message-list__empty-text">No messages yet. Start a conversation!</p>
@@ -47,6 +54,8 @@
 
 <script setup lang="ts">
 import { computed, ref, nextTick, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useChatStore } from '@/stores/chat'
 import type { MessageListProps, MessageListEmits } from '@/types/chat'
 import ChatMessage from './ChatMessage.vue'
 
@@ -59,6 +68,9 @@ const props = withDefaults(defineProps<MessageListProps>(), {
 })
 
 const emit = defineEmits<MessageListEmits>()
+
+const chatStore = useChatStore()
+const { shouldShowCurrentSpeech, currentSpeechMessage } = storeToRefs(chatStore)
 
 const messagesContainer = ref<HTMLElement | null>(null)
 
@@ -98,7 +110,13 @@ watch(
   { immediate: true },
 )
 
-// Auto scroll when on the last page
+// Автоскролл при появлении текущей речи
+watch(shouldShowCurrentSpeech, (showing) => {
+  if (showing) {
+    scrollToBottom()
+  }
+})
+
 watch(
   () => props.currentPage,
   (newPage: number) => {
@@ -168,6 +186,13 @@ defineExpose({
     min-height: 100%;
     @include flex-column;
     justify-content: flex-end;
+  }
+
+  &__current {
+    border-top: 1px solid $border-light;
+    background: rgba($primary-color, 0.02);
+    margin-top: 8px;
+    border-radius: $border-radius;
   }
 
   &__empty {
@@ -257,5 +282,24 @@ defineExpose({
 .message-leave-to {
   opacity: 0;
   transform: translateY(-20px);
+}
+
+// Current response transitions
+.current-response-enter-active {
+  transition: all 0.4s ease-out;
+}
+
+.current-response-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.current-response-enter-from {
+  opacity: 0;
+  transform: translateY(15px) scale(0.98);
+}
+
+.current-response-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(1.02);
 }
 </style>

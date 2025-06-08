@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const chatStore = useChatStore()
 const { isLoading, isResponding, currentResponseText } = storeToRefs(chatStore)
+const { startShowingSpeech, stopShowingSpeech } = chatStore
 
 const playerContainer = ref<HTMLElement | null>(null)
 const spinePlayer = ref<spine.SpinePlayer | null>(null)
@@ -220,7 +221,6 @@ const speak = async (text: string) => {
   const audio = await loadAudio(cleanText)
   if (!audio) return
 
-  // Ждем загрузки метаданных аудио чтобы получить длительность
   await new Promise((resolve) => {
     if (audio.readyState >= 1) {
       resolve(undefined)
@@ -229,7 +229,7 @@ const speak = async (text: string) => {
     }
   })
 
-  const audioDuration = audio.duration * 1000 // в миллисекундах
+  const audioDuration = audio.duration * 1000
   console.log('🔊 Audio duration:', audioDuration, 'ms')
 
   isAnimating.value = true
@@ -250,6 +250,7 @@ const speak = async (text: string) => {
     internalState.value = 'idle'
     clearFaceAnimation()
     currentUtterance = null
+    stopShowingSpeech()
   }
 
   audio.onerror = () => {
@@ -258,12 +259,14 @@ const speak = async (text: string) => {
     internalState.value = 'idle'
     clearFaceAnimation()
     currentUtterance = null
+    stopShowingSpeech()
   }
 
   const audioStartPromise = new Promise<void>((resolve) => {
     const onPlaying = () => {
       console.log('🔊 Audio actually started playing')
       audio.removeEventListener('playing', onPlaying)
+      startShowingSpeech()
       resolve()
     }
     audio.addEventListener('playing', onPlaying)

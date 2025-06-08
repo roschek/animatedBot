@@ -17,6 +17,7 @@ export interface ChatState {
   messagesPerPage: Ref<number>
   isResponding: Ref<boolean>
   currentResponseText: Ref<string>
+  isShowingSpeech: Ref<boolean>
 }
 
 export interface ChatActions {
@@ -28,6 +29,8 @@ export interface ChatActions {
   loadNextPage: () => void
   loadPreviousPage: () => void
   initializeChat: () => void
+  startShowingSpeech: () => void
+  stopShowingSpeech: () => void
 }
 
 export interface ChatGetters {
@@ -35,6 +38,8 @@ export interface ChatGetters {
   totalPages: ComputedRef<number>
   paginatedMessages: ComputedRef<ChatMessage[]>
   hasMoreMessages: ComputedRef<boolean>
+  shouldShowCurrentSpeech: ComputedRef<boolean>
+  currentSpeechMessage: ComputedRef<ChatMessage>
 }
 
 export interface ChatStore extends ChatState, ChatActions, ChatGetters {}
@@ -58,6 +63,7 @@ export interface MessageListProps {
 }
 
 export interface MessageInputProps {
+  isLoading: boolean
   maxLength: number
 }
 

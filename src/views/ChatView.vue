@@ -14,7 +14,8 @@
               :total-messages="totalMessages"
               :current-page="currentPage"
               :total-pages="totalPages"
-              :has-more-messages="hasMoreMessages"
+              :has-more-messages="hasMoreMessages"              
+              :current-response-text="currentResponseText"
               @load-next-page="loadNextPage"
               @load-previous-page="loadPreviousPage"
               @clear-messages="clearMessages"
@@ -27,7 +28,7 @@
         </div>
 
         <div class="chat-page__input">
-          <MessageInput :max-length="100" @send-message="handleSendMessage" />
+          <MessageInput :is-loading="chatStore.isLoading" :max-length="100" @send-message="handleSendMessage" />
         </div>
       </main>
     </div>
@@ -43,8 +44,14 @@ import MessageInput from '@/components/Chat/MessageInput.vue'
 import AnimatedCharacter from '@/components/Animation/AnimatedCharacter.vue'
 
 const chatStore = useChatStore()
-const { paginatedMessages, totalMessages, currentPage, totalPages, hasMoreMessages } =
-  storeToRefs(chatStore)
+const {
+  paginatedMessages,
+  totalMessages,
+  currentPage,
+  totalPages,
+  hasMoreMessages,
+  currentResponseText,
+} = storeToRefs(chatStore)
 
 const { sendMessage, clearMessages, loadNextPage, loadPreviousPage, initializeChat } = chatStore
 
