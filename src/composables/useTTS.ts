@@ -64,7 +64,7 @@ export function useTTS() {
     isLoading: false,
     error: null,
     currentAudio: null,
-    voice: 'rachel',
+    voice: 'alice',
     settings: {
       stability: 0.5,
       similarity_boost: 0.75,

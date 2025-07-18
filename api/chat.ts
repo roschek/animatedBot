@@ -16,10 +16,16 @@ export async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { message } = req.body
 
-    const response = await anthropic.messages.create({
+        const response = await anthropic.messages.create({
       model: 'claude-3-haiku-20240307',
-      max_tokens: 250,
-      messages: [{ role: 'user', content: message }],
+      max_tokens: 150,
+      messages: [
+        {
+          role: 'user',
+          content: `You are a teenager talking to another teenager. Always respond in 2-3 sentences using youth
+          slang and casual conversational style. Be friendly but informal. Here's the message: ${message}`
+        }
+      ],
     })
 
     let reply = 'No response'

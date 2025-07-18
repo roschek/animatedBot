@@ -10,7 +10,6 @@ export const useChatStore = defineStore('chat', () => {
   const isResponding = ref<boolean>(false)
   const currentResponseText = ref<string>('')
 
-  // Добавляем контроль показа речи
   const isShowingSpeech = ref<boolean>(false)
 
   const totalMessages = computed((): number => messages.value.length)
@@ -73,7 +72,7 @@ export const useChatStore = defineStore('chat', () => {
 
   // Методы контроля речи
   const startShowingSpeech = () => {
-    removeTypingMessage() // Убираем typing когда начинается речь
+    removeTypingMessage()
     isShowingSpeech.value = true
     console.log('💬 Started showing speech')
   }
@@ -129,8 +128,7 @@ export const useChatStore = defineStore('chat', () => {
 
       const data = await response.json()
 
-      // НЕ убираем typing сразу! Оставляем до начала речи
-      // Просто ставим текст для персонажа
+
       currentResponseText.value = data.response
       isResponding.value = true
     } catch (error) {
